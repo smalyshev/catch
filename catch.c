@@ -101,6 +101,7 @@ void print_trace()
 
 int safe_pointer(void *pointer)
 {
+	if(!pointer) return 0;
 	if (write(nullfd, pointer, 1) < 0)
 	{
 		return 0;
@@ -117,7 +118,7 @@ int makes_sense(const char *pointer)
 
 const char * safe_string(const char *ptr)
 {
-	if(ptr == NULL) return "[NULL]";
+	if(!ptr) return "[NULL]";
 	return makes_sense(ptr)?ptr:"[???]";
 }
 
@@ -245,6 +246,7 @@ static void setsignals()
 	sigaction(SIGBUS, &act, NULL);
 	sigaction(SIGILL, &act, NULL);
 	sigaction(SIGSEGV, &act, NULL);
+	sigaction(5, &act, NULL);
 }
 
 /* {{{ PHP_MINIT_FUNCTION
