@@ -14,7 +14,9 @@ ZEND_DECLARE_MODULE_GLOBALS(catch);
 
 int nullfd;
 static void (*old_error_handler)(int error_num, const char *error_filename, const uint error_lineno, const char *format, va_list args);
+static void (*old_execute)(zend_op_array *op_array TSRMLS_DC);
 	
+
 /* {{{ catch_functions[]
  *
  * Every user visible function must have an entry in catch_functions[].
@@ -72,6 +74,8 @@ static PHP_INI_MH(OnUpdateHandler)
 			*p |= CATCH_STACK;
 		} else if(strncmp(new_value, "phptrace", len) == 0) {
 			*p |= CATCH_PHP_STACK;
+		} else if(strncmp(new_value, "throw", len) == 0) {
+			*p |= CATCH_THROW;
 		}
 		if(next) {
 			new_value = next+1;
@@ -224,9 +228,42 @@ static void catch_error_handler(int error_num, const char *error_filename, const
 #endif
 	} zend_catch {
 		err_handler(ed TSRMLS_CC);
+		if(CATCH_G(on_error) & CATCH_THROW) {
+			EG(current_execute_data) = ed;
+			zend_throw_exception(NULL, "Fatal error happened", error_num TSRMLS_CC);
+			EG(current_execute_data) = NULL;
+			if(CATCH_G(exec_buf)) {
+				longjmp(*CATCH_G(exec_buf), 1);
+			}
+		}
 		zend_bailout();
 	} zend_end_try();
 }
+
+ void catch_execute(zend_op_array *op_array TSRMLS_DC)
+ {
+ 	JMP_BUF *prev_exec = CATCH_G(exec_buf);
+ 	JMP_BUF exec_buf;
+ 	void **top = EG(argument_stack)->top;
+	zend_execute_data *ed = EG(current_execute_data);
+
+ 	CATCH_G(exec_buf) = &exec_buf;
+ 	if(setjmp(*CATCH_G(exec_buf)) != 0) {
+ 		/* we've got back from execute */
+ 		CATCH_G(exec_buf) = prev_exec;
+ 		/* reset arg stack. This will probably cause leaks */
+ 		EG(argument_stack)->top = top;
+ 		EG(current_execute_data) = ed;
+ 		return;
+ 	}
+ 	zend_try {
+ 		old_execute(op_array TSRMLS_CC);
+	 	CATCH_G(exec_buf) = prev_exec;
+ 	} zend_catch {
+ 		CATCH_G(exec_buf) = prev_exec;
+ 		zend_bailout();
+ 	} zend_end_try();
+ }
 
 /* {{{ php_catch_init_globals
  */
@@ -234,6 +271,7 @@ static void php_catch_init_globals(zend_catch_globals *catch_globals)
 {
 	catch_globals->on_crash = 0;
 	catch_globals->on_error = 0;
+	catch_globals->exec_buf = NULL;
 }
 /* }}} */
 
@@ -277,6 +315,8 @@ PHP_RINIT_FUNCTION(catch)
 	setsignals();
 	old_error_handler = zend_error_cb;
 	zend_error_cb = catch_error_handler;
+	old_execute = zend_execute;
+	zend_execute = catch_execute;
 	return SUCCESS;
 }
 /* }}} */
@@ -287,6 +327,7 @@ PHP_RSHUTDOWN_FUNCTION(catch)
 {
 	setsignals();
 	zend_error_cb = old_error_handler;
+	zend_execute = old_execute;
 	return SUCCESS;
 }
 /* }}} */

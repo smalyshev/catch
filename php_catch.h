@@ -1,3 +1,4 @@
+#define JMP_BUF jmp_buf
 /*
   +----------------------------------------------------------------------+
   | PHP Version 5                                                        |
@@ -39,13 +40,14 @@ PHP_FUNCTION(catch_report);
 ZEND_BEGIN_MODULE_GLOBALS(catch)
 	long on_crash;
 	long on_error;
-	JMP_BUF *orig_bailout;
-	JMP_BUF bailout;
+  zend_bool in_execute;
+  JMP_BUF *exec_buf;
 ZEND_END_MODULE_GLOBALS(catch)
 
-#define CATCH_STACK		1
+#define CATCH_STACK		  1
 #define CATCH_PHP_STACK	2
-#define CATCH_STOP		4
+#define CATCH_STOP		  4
+#define CATCH_THROW     8
 
 #ifdef ZTS
 #define CATCH_G(v) TSRMG(catch_globals_id, zend_catch_globals *, v)
