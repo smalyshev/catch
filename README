@@ -1,1 +1,11 @@
-Module to catch & report fatal errors andcrashes in PHP.
+Module to catch & report fatal errors and crashes in PHP.
+
+Configs:
+catch.oncrash=stop,trace,phptrace
+catch.onerror=phptrace
+
+Actions:
+- stop - display message on stderr with PID and pause
+- trace - print C backtrace to stderr (may be useless if you don't have debug info)
+- phptrace - print PHP backtrace to stderr
+- throw - on PHP error, convert it to exception. Don't use it, unless you know what you're doing. It will probably crash.
